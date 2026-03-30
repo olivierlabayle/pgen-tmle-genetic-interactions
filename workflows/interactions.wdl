@@ -3,10 +3,18 @@ version 1.0
 workflow interactions {
     input {
         String docker_image = "olivierlabayle/pgen-tmle-interactions:main"
+        String julia_use_sysimage = "true"
+        String julia_threads = "auto"
+
+        Array[PGENFileset] pgen_filesets
+
         File variants_file
-        Int batch_size = 20
-        String use_sysimage = "true"
-        String threads = "auto"
+        String batch_size = "20"
+
+        String npcs = "10"
+        String ip_values = "1000 50 0.05"
+        String maf = "0.01"
+
     }
 
     call get_julia_cmd as get_julia_cmd {
@@ -21,6 +29,22 @@ workflow interactions {
             julia_cmd = get_julia_cmd.julia_cmd,
             variants_file = variants_file,
             batch_size = batch_size
+    }
+
+    scatter (pgen_fileset in pgen_filesets) {
+
+        call ld_prune {
+            input:
+                docker_image = docker_image,
+                chr = pgen_fileset.chr,
+                pgen_file = pgen_fileset.pgen,
+                pvar_file = pgen_fileset.pvar,
+                psam_file = pgen_fileset.psam,
+                variants_file = variants_file,
+                ip_values = ip_values,
+                maf = maf
+        }
+
     }
 }
 
@@ -46,6 +70,64 @@ task get_julia_cmd {
     }
 }
 
+task ld_prune {
+    input {
+        String docker_image
+        String chr
+        File pgen_file
+        File pvar_file
+        File psam_file
+        File variants_file
+        String ip_values = "1000 50 0.05"
+        String maf = "0.01"
+    }
+
+    command <<<
+        pgen_prefix=$(dirname "~{pgen_file}")/$(basename "~{pgen_file}" .pgen)
+
+        plink2 \
+            --pfile ${pgen_prefix} \
+            --indep-pairwise ~{ip_values}
+        # Always exclude high LD regions stored in the docker image at /opt/PopGen/assets/exclude_b38.txt
+        plink2 \
+            --bfile ${pgen_prefix} \
+            --extract plink2.prune.in \
+            --maf ~{maf} \
+            --make-bed \
+            --exclude range /opt/PopGen/assets/exclude_b38.txt \
+            --out ld_runed.chr_~{chr}
+        # Exlude variants around queried variants to avoid proximal contamination
+        awk 'BEGIN{OFS="\t"}
+            NR==1 {
+            for (i=1; i<=NF; i++) {
+                if ($i=="CHROM") c=i
+                else if ($i=="POS") p=i
+                else if ($i=="ID") id=i
+            }
+            next
+            }
+            {
+            start = $p - 500000
+            if (start < 0) start = 0
+            end = $p + 500000
+            print $c, start, end
+        }' ~{variants_file} > exclude_ranges.txt
+    >>>
+
+    output {
+        PLINKFileset ld_pruned_fileset = object {
+            chr: chr,
+            bed: "${output_prefix}.bed",
+            bim: "${output_prefix}.bim",
+            fam: "${output_prefix}.fam"
+        }
+    }
+
+    runtime {
+        docker: docker_image
+        dx_instance_type: "mem1_ssd1_v2_x8"
+    }
+}
 
 task generate_interaction_batches {
     input {
