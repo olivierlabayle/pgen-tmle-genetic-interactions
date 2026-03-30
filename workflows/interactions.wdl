@@ -22,7 +22,6 @@ workflow interactions {
         String ip_values = "1000 50 0.05"
         String maf = "0.01"
 
-
     }
 
     call get_julia_cmd as get_julia_cmd {
@@ -40,7 +39,6 @@ workflow interactions {
     }
 
     scatter (pgen_fileset in pgen_filesets) {
-
         call ld_prune {
             input:
                 docker_image = docker_image,
@@ -52,7 +50,28 @@ workflow interactions {
                 ip_values = ip_values,
                 maf = maf
         }
+        
+        File plink_bed_files = ld_prune.ld_pruned_fileset.bed
+        File plink_bim_files = ld_prune.ld_pruned_fileset.bim
+        File plink_fam_files = ld_prune.ld_pruned_fileset.fam
+    }
 
+    call merge_and_pca {
+        input:
+            docker_image = docker_image,
+            plink_bed_files = plink_bed_files,
+            plink_bim_files = plink_bim_files,
+            plink_fam_files = plink_fam_files,
+            npcs = npcs,
+            approx_pca = approx_pca
+    }
+
+    output {
+        Array[File] interaction_batches = generate_interaction_batches.interaction_batches
+        Array[PLINKFileset] ld_prune.ld_pruned_fileset
+        File merge_and_pca.eigenvec
+        File merge_and_pca.eigenval
+        PLINKFileset merge_and_pca.merged_ld_pruned_fileset
     }
 }
 
@@ -78,6 +97,58 @@ task get_julia_cmd {
     }
 }
 
+task merge_and_pca {
+    input {
+        String docker_image
+        Array[File] plink_bed_files
+        Array[File] plink_bim_files
+        Array[File] plink_fam_files
+        String npcs = "10"
+        String approx_pca = "false"
+    }
+
+    command <<<
+        # Merge filesets
+        for f in ~{sep=" " plink_bed_files}; do
+            echo "${f%.bed}"
+        done > merge_list.txt
+
+        plink \
+            --biallelic-only \
+            --merge-list merge_list.txt \
+            --make-bed \
+            --out ld_pruned.no_proximal.all_chr
+
+        approx_option=""
+        if [[ "~{approx_pca}" == "true" ]]; then
+            approx_option=" approx"
+        fi
+
+        plink2 \
+            --bfile ld_pruned.no_proximal.all_chr \
+            --pca ~{npcs}${approx_option} \
+            --out ld_pruned.no_proximal.all_chr
+    >>>
+
+    output {
+        PLINKFileset merged_ld_pruned_fileset = object {
+            chr: "all",
+            bed: "ld_pruned.no_proximal.all_chr.bed",
+            bim: "ld_pruned.no_proximal.all_chr.bim",
+            fam: "ld_pruned.no_proximal.all_chr.fam"
+        }
+
+        File eigenvec = "ld_pruned.no_proximal.all_chr.eigenvec"
+        File eigenval = "ld_pruned.no_proximal.all_chr.eigenval"
+    }
+
+    runtime {
+        docker: docker_image
+        dx_instance_type: "mem2_ssd1_v2_x16"
+    }
+}
+
+
 task ld_prune {
     input {
         String docker_image
@@ -96,13 +167,13 @@ task ld_prune {
         plink2 \
             --pfile ${pgen_prefix} \
             --indep-pairwise ~{ip_values}
-        # Always exclude high LD regions stored in the docker image at /opt/PopGen/assets/exclude_b38.txt
+        # Always exclude high LD regions stored in the docker image at /opt/PgenInteractions/exclude_b38.txt
         plink2 \
             --pfile ${pgen_prefix} \
             --extract plink2.prune.in \
             --maf ~{maf} \
             --make-bed \
-            --exclude range /opt/PopGen/assets/exclude_b38.txt \
+            --exclude range /opt/PgenInteractions/assets/exclude_b38.txt \
             --out ld_pruned.chr_~{chr}
         # Exlude variants around queried variants to avoid proximal contamination
         awk 'BEGIN{OFS="\t"}

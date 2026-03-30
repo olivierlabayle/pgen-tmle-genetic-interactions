@@ -1,6 +1,6 @@
 function generate_interaction_batches(variants_file; output_prefix="interactions", batch_size=20)
     # Read variants
-    variants = CSV.read(variants_file, DataFrame;select=[:CHROM, :POS, :ID])
+    variants = CSV.read(variants_file, DataFrame; select=[:CHROM, :POS, :ID])
     # Generate Interactions
     variants = NamedTuple.(eachrow(variants))
     n_variants = length(variants)

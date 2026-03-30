@@ -22,6 +22,12 @@ RUN rm /var/lib/dpkg/info/libc-bin.* \
         openjdk-17-jdk \
         zlib1g-dev
 
+# Install PLINK
+RUN wget https://s3.amazonaws.com/plink1-assets/plink_linux_x86_64_20250819.zip \
+    && unzip plink_linux_x86_64_20250819.zip \
+    && mv plink /usr/local/bin \
+    && chmod +x /usr/local/bin/plink
+    
 # Install PLINK2
 RUN wget https://s3.amazonaws.com/plink2-assets/alpha6/plink2_linux_x86_64_20250129.zip \
     && unzip plink2_linux_x86_64_20250129.zip \
@@ -35,7 +41,6 @@ COPY bin/ /opt/PgenInteractions/bin/
 COPY Project.toml /opt/PgenInteractions/Project.toml
 
 COPY src/ /opt/PgenInteractions/src/
-
 
 RUN julia --project=/opt/PgenInteractions --startup-file=no -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()' \
     && julia --project=/opt/PgenInteractions --startup-file=no --threads=auto -e 'using PackageCompiler; create_sysimage(["PgenInteractions"], sysimage_path="/opt/PgenInteractions/sysimage.so", include_transitive_dependencies=false, cpu_target=PackageCompiler.default_app_cpu_target())'

@@ -29,3 +29,4 @@ JuliaLocalPreferences.toml
 
 cromwell-executions/
 cromwell-workflow-logs/
+interactions_workflow_outputs/
