@@ -1,19 +1,27 @@
 version 1.0
 
+import "structs.wdl"
+
 workflow interactions {
     input {
         String docker_image = "olivierlabayle/pgen-tmle-interactions:main"
         String julia_use_sysimage = "true"
         String julia_threads = "auto"
 
+        String phenotype
+        Array[String] covariates = ["AGE", "SEX"]
+        File covariates_file
         Array[PGENFileset] pgen_filesets
 
         File variants_file
         String batch_size = "20"
 
         String npcs = "10"
+        String approx_pca = "false"
+
         String ip_values = "1000 50 0.05"
         String maf = "0.01"
+
 
     }
 
@@ -61,7 +69,7 @@ task get_julia_cmd {
         if [[ "~{threads}" == "auto" ]]; then
             julia_cmd_string+=" --threads=auto"
         fi
-        julia_cmd_string+=" /opt/PgenInteractions/run.jl"
+        julia_cmd_string+=" /opt/PgenInteractions/bin/run.jl"
         echo "$julia_cmd_string"
     >>>
 
@@ -95,7 +103,7 @@ task ld_prune {
             --maf ~{maf} \
             --make-bed \
             --exclude range /opt/PopGen/assets/exclude_b38.txt \
-            --out ld_runed.chr_~{chr}
+            --out ld_pruned.chr_~{chr}
         # Exlude variants around queried variants to avoid proximal contamination
         awk 'BEGIN{OFS="\t"}
             NR==1 {
@@ -113,15 +121,19 @@ task ld_prune {
             print $c, start, end
         }' ~{variants_file} > exclude_ranges.txt
 
-
+        plink2 \
+            --bfile ld_pruned.chr_~{chr} \
+            --exclude range exclude_ranges.txt \
+            --make-bed \
+            --out ld_pruned.no_proximal.chr_~{chr}
     >>>
 
     output {
         PLINKFileset ld_pruned_fileset = object {
-            chr: chr,
-            bed: "${output_prefix}.bed",
-            bim: "${output_prefix}.bim",
-            fam: "${output_prefix}.fam"
+            chr: "${chr}",
+            bed: "ld_pruned.no_proximal.chr_${chr}.bed",
+            bim: "ld_pruned.no_proximal.chr_${chr}.bim",
+            fam: "ld_pruned.no_proximal.chr_${chr}.fam"
         }
     }
 

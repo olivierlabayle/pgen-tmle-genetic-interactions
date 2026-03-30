@@ -1,15 +1,12 @@
 {
-    "gwas.julia_threads": "1",
-    "gwas.loco_pca": "true",
-    "gwas.meta_exclude": ["AMR"],
-    "gwas.julia_use_sysimage": "false",
-    "gwas.covariates_file": "test/assets/covariates/covariates.csv",
-    "gwas.groupby": ["SUPERPOPULATION"],
-    "gwas.covariates": ["AGE", "SEX", "AGE_x_AGE"],
-    "gwas.phenotypes": ["SEVERE_PNEUMONIA", "SEVERE_COVID_19"],
-    "variants_file": "test/assets/workflow_clumps.tsv",
-    "gwas.approx_pca": "false",
-    "gwas.pgen_filesets": [
+    "interactions.julia_threads": "1",
+    "interactions.julia_use_sysimage": "false",
+    "interactions.covariates_file": "test/assets/covariates/covariates.csv",
+    "interactions.covariates": ["AGE", "SEX", "AGE_x_AGE"],
+    "interactions.phenotype": "SEVERE_COVID_19",
+    "interactions.variants_file": "test/assets/workflow_clumps.tsv",
+    "interactions.approx_pca": "false",
+    "interactions.pgen_filesets": [
         {
             "chr": "1",
             "pgen": "test/assets/pgen/chr1.qced.pgen",
