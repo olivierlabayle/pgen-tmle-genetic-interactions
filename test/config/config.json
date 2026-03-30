@@ -2,7 +2,7 @@
     "interactions.julia_threads": "1",
     "interactions.julia_use_sysimage": "false",
     "interactions.covariates_file": "test/assets/covariates/covariates.csv",
-    "interactions.covariates": ["AGE", "SEX", "AGE_x_AGE"],
+    "interactions.covariates": ["AGE", "SEX"],
     "interactions.phenotype": "SEVERE_COVID_19",
     "interactions.variants_file": "test/assets/workflow_clumps.tsv",
     "interactions.approx_pca": "false",

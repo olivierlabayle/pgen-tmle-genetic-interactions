@@ -10,6 +10,7 @@ workflow interactions {
 
         String phenotype
         Array[String] covariates = ["AGE", "SEX"]
+        Array[String] confounders = []
         File covariates_file
         Array[PGENFileset] pgen_filesets
 
@@ -54,6 +55,11 @@ workflow interactions {
         File plink_bed_files = ld_prune.ld_pruned_fileset.bed
         File plink_bim_files = ld_prune.ld_pruned_fileset.bim
         File plink_fam_files = ld_prune.ld_pruned_fileset.fam
+
+        File pgen_files = pgen_fileset.pgen
+        File pvar_files = pgen_fileset.pvar
+        File psam_files = pgen_fileset.psam
+        String chromosomes = pgen_fileset.chr
     }
 
     call merge_and_pca {
@@ -66,13 +72,106 @@ workflow interactions {
             approx_pca = approx_pca
     }
 
+    scatter (interaction_batch in generate_interaction_batches.interaction_batches) {
+        # Those lines aimed to send only the relevant chromosomes to the estimate_interaction call
+        # However the contains function does not seem to be implemented in cromwell so I aborted
+        # call extract_chroms {
+        #     input: 
+        #         batch_file = interaction_batch
+        # }
+
+        # scatter (pgen_fileset in pgen_filesets) {
+        #     PGENFileset keep = if (contains(extract_chroms.chroms, pgen_fileset.chr)) then pgen_fileset else None
+        # }
+
+        # Array[PGENFileset] selected_pgen_filesets = select_all(keep)
+
+        # scatter (selected_pgen_fileset in selected_pgen_filesets) {
+        #     File selected_pgen_files = selected_pgen_fileset.pgen
+        #     File selected_pvar_files = selected_pgen_fileset.pvar
+        #     File selected_psam_files = selected_pgen_fileset.psam
+        # }
+        # Estimate interactions for the batch
+        
+        call estimate_interaction {
+            input:
+                docker_image = docker_image,
+                julia_cmd = get_julia_cmd.julia_cmd,
+                covariates_file = covariates_file,
+                pcs_file = merge_and_pca.eigenvec,
+                chromosomes = chromosomes,
+                pgen_files = pgen_files,
+                pvar_files = pvar_files,
+                psam_files = psam_files,
+                interaction_batch_file = interaction_batch,
+                phenotype = phenotype,
+                covariates = covariates,
+                confounders = confounders
+        }
+    }
+
     output {
         Array[File] interaction_batches = generate_interaction_batches.interaction_batches
-        Array[PLINKFileset] ld_prune.ld_pruned_fileset
-        File merge_and_pca.eigenvec
-        File merge_and_pca.eigenval
-        PLINKFileset merge_and_pca.merged_ld_pruned_fileset
+        Array[PLINKFileset] ld_pruned_filesets = ld_prune.ld_pruned_fileset
+        File eigenvec = merge_and_pca.eigenvec
+        File eigenval = merge_and_pca.eigenval
+        PLINKFileset merged_fileset = merge_and_pca.merged_ld_pruned_fileset
     }
+}
+
+task estimate_interaction {
+    input {
+        String docker_image
+        String julia_cmd
+        File covariates_file
+        File pcs_file
+        Array[String] chromosomes
+        Array[File] pgen_files
+        Array[File] pvar_files
+        Array[File] psam_files
+        File interaction_batch_file
+        String phenotype
+        Array[String] covariates
+        Array[String] confounders
+    }
+
+    command <<<
+        for f in ~{sep=" " pgen_files}; do
+            echo "${f%.bed}"
+        done > pgen_files.txt
+
+        for f in ~{sep=" " chromosomes}; do
+            echo "${f%.bed}"
+        done > chromosomes.txt
+
+        covariate_opt="~{sep=" " covariates}"
+        if [ -z "${covariate_opt}" ]; then
+            covariate_opt=" --covariates ${covariate_opt}"
+        fi
+
+        confounders_opt="~{sep=" " confounders}"
+        if [ -z "${confounders_opt}" ]; then
+            confounders_opt=" --confounders $confounders_opt}"
+        fi
+
+        ~{julia_cmd} estimate-interactions \
+            pgen_files.txt \
+            chromosomes.txt \
+            ~{covariates_file} \
+            ~{pcs_file} \
+            ~{interaction_batch_file} \
+            --phenotype ~{phenotype}${covariate_opt}${confounders_opt}
+    >>>
+
+    output {
+        File interaction_estimates = ""
+    }
+
+    runtime {
+        docker: docker_image
+        dx_instance_type: "mem1_ssd1_v2_x8"
+    }
+
 }
 
 task get_julia_cmd {
@@ -95,6 +194,23 @@ task get_julia_cmd {
     output {
         String julia_cmd = read_string(stdout())
     }
+}
+
+task extract_chroms {
+  input {
+    File batch_file
+  }
+
+  command <<<
+    # extract both columns, remove 'chr', flatten, sort & unique
+    tail -n +2 ~{batch_file} | cut -f1 > col1.txt
+    tail -n +2 ~{batch_file} | cut -f4 > col2.txt
+    cat col1.txt col2.txt | sed 's/^chr//' | sort | uniq > out.txt
+  >>>
+
+  output {
+    Array[String] chroms = read_lines("out.txt")
+  }
 }
 
 task merge_and_pca {

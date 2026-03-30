@@ -52,7 +52,16 @@ for shard in 0:2
 end
 
 # Test merging and PCA
- 
+pca_output_dir = joinpath(results_dir, "call-merge_and_pca", "execution")
+pruned_variants_df = CSV.read(
+    joinpath(pca_output_dir, "ld_pruned.no_proximal.all_chr.bim"),
+    DataFrame;
+    header=[:CHROM, :ID, :CM, :POS, :REF, :ALT]
+)
+@test nrow(pruned_variants_df) > 15
+@test length(readlines(joinpath(pca_output_dir, "ld_pruned.no_proximal.all_chr.eigenval"))) == 10
+pcs = CSV.read(joinpath(pca_output_dir, "ld_pruned.no_proximal.all_chr.eigenvec"), DataFrame)
+@test names(pcs) == ["#FID", "IID", ("PC$i" for i in 1:10)...]
 
 
 

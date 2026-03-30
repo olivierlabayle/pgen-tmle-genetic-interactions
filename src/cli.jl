@@ -12,6 +12,10 @@ function cli_settings()
             action = :command
             help = "Generate interaction files to be estimated in parallel."
 
+        "estimate-interactions"
+            action = :command
+            help = "Estimate all interactions in the batch file"
+
     end
 
     @add_arg_table! s["generate-interactions"] begin
@@ -33,6 +37,43 @@ function cli_settings()
             default = 20
     end
 
+    @add_arg_table! s["estimate-interactions"] begin
+        "pgen-list"
+            arg_type = String
+            help = "Path to list of pgen files"
+        
+        "chrom-list"
+            arg_type = String
+            help = "Path to list of chromosomes"
+
+        "covariates-file"
+            arg_type = String
+            help = "Path to covariates"
+
+        "pcs-file"
+            arg_type = String
+            help = "Path to pcs"
+
+        "interaction-batch-file"
+            arg_type = String
+            help = "Path to interaction batch to estimate"
+
+        "--phenotype"
+            arg_type = String
+            default = "Y"
+            help = "Target phenotype"
+
+        "--covariates"
+            arg_type = String
+            default = nothing
+            help = "Comma separated list of extra covariates"
+        
+        "--confounders"
+            arg_type = String
+            default = nothing
+            help = "Comma separated list of extra confounders"
+    end
+
     return s
 end
 
@@ -46,6 +87,17 @@ function julia_main()::Cint
             cmd_settings["variants-file"];
             output_prefix=cmd_settings["output-prefix"],
             batch_size=cmd_settings["batch-size"]
+        )
+    elseif cmd == "estimate-interactions"
+        estimate_interactions(
+            cmd_settings["pgen-list"],
+            cmd_settings["chrom-list"],
+            cmd_settings["covariates-file"],
+            cmd_settings["pcs-file"],
+            cmd_settings["interaction-batch-file"];
+            phenotype=cmd_settings["phenotype"],
+            covariates=cmd_settings["covariates"],
+            confounders=cmd_settings["confounders"]
         )
     else
         throw(ArgumentError(string("Unknown command: ", cmd)))
