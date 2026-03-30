@@ -28,12 +28,14 @@ RUN wget https://s3.amazonaws.com/plink2-assets/alpha6/plink2_linux_x86_64_20250
     && mv plink2 /usr/local/bin \
     && chmod +x /usr/local/bin/plink2
 
+COPY assets/ /opt/PgenInteractions/assets/
+
+COPY bin/ /opt/PgenInteractions/bin/
 
 COPY Project.toml /opt/PgenInteractions/Project.toml
 
 COPY src/ /opt/PgenInteractions/src/
 
-COPY bin/ /opt/PgenInteractions/bin/
 
 RUN julia --project=/opt/PgenInteractions --startup-file=no -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()' \
     && julia --project=/opt/PgenInteractions --startup-file=no --threads=auto -e 'using PackageCompiler; create_sysimage(["PgenInteractions"], sysimage_path="/opt/PgenInteractions/sysimage.so", include_transitive_dependencies=false, cpu_target=PackageCompiler.default_app_cpu_target())'

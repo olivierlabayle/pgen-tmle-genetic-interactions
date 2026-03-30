@@ -90,7 +90,7 @@ task ld_prune {
             --indep-pairwise ~{ip_values}
         # Always exclude high LD regions stored in the docker image at /opt/PopGen/assets/exclude_b38.txt
         plink2 \
-            --bfile ${pgen_prefix} \
+            --pfile ${pgen_prefix} \
             --extract plink2.prune.in \
             --maf ~{maf} \
             --make-bed \
@@ -112,6 +112,8 @@ task ld_prune {
             end = $p + 500000
             print $c, start, end
         }' ~{variants_file} > exclude_ranges.txt
+
+
     >>>
 
     output {
