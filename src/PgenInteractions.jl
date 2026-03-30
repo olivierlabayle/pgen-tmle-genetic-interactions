@@ -8,6 +8,7 @@ using ArgParse
 
 include("estimands.jl")
 include("cli.jl")
+include("estimate.jl")
 
 export julia_main
 

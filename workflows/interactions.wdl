@@ -144,12 +144,12 @@ task estimate_interaction {
             echo "${f%.bed}"
         done > chromosomes.txt
 
-        covariate_opt="~{sep=" " covariates}"
+        covariate_opt="~{sep="," covariates}"
         if [ -z "${covariate_opt}" ]; then
             covariate_opt=" --covariates ${covariate_opt}"
         fi
 
-        confounders_opt="~{sep=" " confounders}"
+        confounders_opt="~{sep="," confounders}"
         if [ -z "${confounders_opt}" ]; then
             confounders_opt=" --confounders $confounders_opt}"
         fi
