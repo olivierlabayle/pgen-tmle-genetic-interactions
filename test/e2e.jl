@@ -42,7 +42,7 @@ interactions_df = mapreduce(batch_file -> CSV.read(batch_file, DataFrame), vcat,
 @test nrow(interactions_df) == 3
 
 # Test LD pruning removes variants in interactions
-ld_pruning_dir = joinpath(results_dir, "call-ld_prune")
+ld_pruning_dir = joinpath(results_dir, "call-ld_prune_and_extract_variants_of_interest")
 for shard in 0:2
     ld_output_dir = joinpath(ld_pruning_dir, "shard-$shard", "execution")
     bim = CSV.read(
