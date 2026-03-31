@@ -18,7 +18,7 @@ workflow interactions {
         String batch_size = "20"
 
         String npcs = "10"
-        String approx_pca = "false"
+        String approx_pca = "true"
 
         String ip_values = "1000 50 0.05"
         String maf = "0.01"
