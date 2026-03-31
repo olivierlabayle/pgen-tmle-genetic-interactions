@@ -57,6 +57,11 @@ function cli_settings()
         "interaction-batch-file"
             arg_type = String
             help = "Path to interaction batch to estimate"
+        
+        "--positivity-constraint"
+            arg_type = Float64
+            default = 0.01
+            help = "Positivity constraint to apply on estimands"
 
         "--phenotype"
             arg_type = String
@@ -72,6 +77,16 @@ function cli_settings()
             arg_type = String
             default = nothing
             help = "Comma separated list of extra confounders"
+
+        "--estimator-config"
+            arg_type = String
+            default = nothing
+            help = "Estimator's configuration"
+
+        "--output-prefix"
+            arg_type = String
+            default = "estimates"
+            help = "Output prefix"
     end
 
     return s
@@ -97,7 +112,10 @@ function julia_main()::Cint
             cmd_settings["interaction-batch-file"];
             phenotype=cmd_settings["phenotype"],
             covariates=cmd_settings["covariates"],
-            confounders=cmd_settings["confounders"]
+            confounders=cmd_settings["confounders"],
+            positivity_constraint=cmd_settings["positivity-constraint"],
+            estimator_config=cmd_settings["estimator-config"],
+            output_prefix=cmd_settings["output-prefix"]
         )
     else
         throw(ArgumentError(string("Unknown command: ", cmd)))

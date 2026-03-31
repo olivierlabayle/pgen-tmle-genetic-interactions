@@ -23,6 +23,9 @@ workflow interactions {
         String ip_values = "1000 50 0.05"
         String maf = "0.01"
 
+        String positivity_constraint = "0.01"
+        String estimator_config = "wtmle"
+
     }
 
     call get_julia_cmd as get_julia_cmd {
@@ -106,7 +109,9 @@ workflow interactions {
                 interaction_batch_file = interaction_batch,
                 phenotype = phenotype,
                 covariates = covariates,
-                confounders = confounders
+                confounders = confounders,
+                positivity_constraint = positivity_constraint,
+                estimator_config = estimator_config
         }
     }
 
@@ -133,7 +138,11 @@ task estimate_interaction {
         String phenotype
         Array[String] covariates
         Array[String] confounders
+        String positivity_constraint = "0.01"
+        String estimator_config = "wtmle"
     }
+
+    String output_prefix = basename(interaction_batch_file, ".tsv")
 
     command <<<
         for f in ~{sep=" " pgen_files}; do
@@ -145,12 +154,12 @@ task estimate_interaction {
         done > chromosomes.txt
 
         covariate_opt="~{sep="," covariates}"
-        if [ -z "${covariate_opt}" ]; then
+        if [ -n "${covariate_opt}" ]; then
             covariate_opt=" --covariates ${covariate_opt}"
         fi
 
         confounders_opt="~{sep="," confounders}"
-        if [ -z "${confounders_opt}" ]; then
+        if [ -n "${confounders_opt}" ]; then
             confounders_opt=" --confounders $confounders_opt}"
         fi
 
@@ -160,11 +169,15 @@ task estimate_interaction {
             ~{covariates_file} \
             ~{pcs_file} \
             ~{interaction_batch_file} \
+            --positivity-constraint ~{positivity_constraint} \
+            --estimator-config ~{estimator_config} \
+            --output-prefix ~{output_prefix} \
             --phenotype ~{phenotype}${covariate_opt}${confounders_opt}
     >>>
 
     output {
-        File interaction_estimates = ""
+        File? json_interaction_estimates = "${output_prefix}.json"
+        File? hdf5_interaction_estimates = "${output_prefix}.hdf5"
     }
 
     runtime {

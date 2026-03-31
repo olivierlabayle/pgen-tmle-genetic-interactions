@@ -93,21 +93,12 @@ function estimate_interactions(
     interaction_batch_file;
     phenotype="Y",
     covariates=nothing,
-    confounders=nothing
+    confounders=nothing,
+    positivity_constraint=0.01,
+    estimator_config="wtmle",
+    output_prefix="estimates"
     )
-    positivity_constraint = 0.01
-    estimators_config = "wtmle"
-    output_prefix = replace(basename(interaction_batch_file), ".tsv" => "")
 
-    phenotype = "SEVERE_COVID_19"
-    covariates = "AGE,SEX"
-    confounders = nothing
-    pgen_file_list = "cromwell-executions/interactions/cec5e018-21e7-419f-97ff-575e5cd89e74/call-estimate_interaction/shard-1/execution/pgen_files.txt"
-    chrom_list = "cromwell-executions/interactions/cec5e018-21e7-419f-97ff-575e5cd89e74/call-estimate_interaction/shard-1/execution/chromosomes.txt"
-    interaction_batch_file = "cromwell-executions/interactions/cec5e018-21e7-419f-97ff-575e5cd89e74/call-estimate_interaction/shard-1/inputs/-891516308/interactions.batch_2.tsv"
-    covariates_file = "cromwell-executions/interactions/cec5e018-21e7-419f-97ff-575e5cd89e74/call-estimate_interaction/shard-1/inputs/250885478/covariates.csv"
-    pcs_file = "cromwell-executions/interactions/cec5e018-21e7-419f-97ff-575e5cd89e74/call-estimate_interaction/shard-1/inputs/390391270/ld_pruned.no_proximal.all_chr.eigenvec"
-    
     confounders = make_list_from_option(confounders)
     covariates = make_list_from_option(covariates)
     chr_to_pgen = Dict(chr => file for (chr, file) in zip(readlines(chrom_list), readlines(pgen_file_list)))
@@ -119,24 +110,36 @@ function estimate_interactions(
     )
     pcs = filter(startswith("PC"), names(dataset))
     all_confounders = vcat(confounders, pcs)
-    estimands = mapreduce(vcat, eachrow(interaction_variants)) do row
-        factorialEstimand(
-            AIE,
-            (row.ID_1, row.ID_2),
-            phenotype;
-            confounders=all_confounders,
-            positivity_constraint=positivity_constraint,
-            outcome_extra_covariates=covariates,
-            dataset=dataset
-        )
+
+    estimands = []
+    for row in eachrow(interaction_variants)
+        try 
+            Ψ = factorialEstimand(
+                AIE,
+                (row.ID_1, row.ID_2),
+                phenotype;
+                confounders=all_confounders,
+                positivity_constraint=positivity_constraint,
+                outcome_extra_covariates=covariates,
+                dataset=dataset,
+                verbosity=0
+            )
+            push!(estimands, Ψ)
+        catch err
+            if err != ArgumentError("No component passed the positivity constraint.")
+                throw(err)
+            end
+        end
     end
 
-    runner = Runner(dataset;
-        estimands_config=TMLE.Configuration(estimands=estimands), 
-        estimators_spec=estimators_config, 
-        outputs=TMLECLI.Outputs(json=string(output_prefix, ".json"), hdf5=string(output_prefix, ".json")), 
-    )
-    runner()
+    if length(estimands) > 0
+        runner = Runner(dataset;
+            estimands_config=TMLE.Configuration(estimands=estimands), 
+            estimators_spec=estimator_config, 
+            outputs=TMLECLI.Outputs(json=string(output_prefix, ".json"), hdf5=string(output_prefix, ".hdf5")), 
+        )
+        runner()
+    end
 
     return 0
 end
