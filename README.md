@@ -1,10 +1,12 @@
-# pgen-tmle-genetic-interactions
+# WDL-PGEN-TMLE-Interactions
 
 Run Semi-parametric estimation of pairwise interactions from PGEN files.
 
 ## Running the Workflow on the UKB Rap
 
 ### Workflow Inputs
+
+Note that almost all arguments must be strings.
 
 - `docker_image` (default: "olivierlabayle/pgen-tmle-interactions:main"): The docker image used to execute most tasks.
 - `julia_use_sysimage` (default: "true"): For faster Julia execution (only disable for development.) 
@@ -18,7 +20,7 @@ Run Semi-parametric estimation of pairwise interactions from PGEN files.
   - `CHROM`: The chromosome without a "chr" prefix, e.g., 1, 2, 3
   - `POS`: The position of the variant.
   - `ID`: The variant unique ID.
-- `batch_size` (default: "20"): For faster execution, estimation is parallelized over batches of the given size. 
+- `batch_size` (default: "200"): For faster execution, estimation is parallelized over batches of the given size. 
 - `npcs` (default: "10"): Number of principal components to use for population stratification adjustment. 
 - `approx_pca` (default "true"): See [plink2's documentation](https://www.cog-genomics.org/plink/2.0/strat).
 - `ip_values` (default: "1000 50 0.05"): Parameter used for LD pruning (seed [plink2's documentation](https://www.cog-genomics.org/plink/2.0/ld)).
