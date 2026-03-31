@@ -115,13 +115,55 @@ workflow interactions {
         }
     }
 
+    call generate_outputs {
+        input:
+            docker_image = docker_image,
+            julia_cmd = get_julia_cmd.julia_cmd,
+            hdf5_files = select_all(estimate_interaction.hdf5_interaction_estimates)
+    }
+
     output {
         Array[File] interaction_batches = generate_interaction_batches.interaction_batches
         Array[PLINKFileset] ld_pruned_filesets = ld_prune.ld_pruned_fileset
         File eigenvec = merge_and_pca.eigenvec
         File eigenval = merge_and_pca.eigenval
         PLINKFileset merged_fileset = merge_and_pca.merged_ld_pruned_fileset
+        Array[File] json_estimates = select_all(estimate_interaction.json_interaction_estimates)
+        File hdf5_output = generate_outputs.hdf5_output
+        File yaml_output = generate_outputs.yaml_output
+        File qq_output = generate_outputs.qq_output
+
     }
+}
+
+
+task generate_outputs {
+    input {
+        String docker_image
+        String julia_cmd
+        Array[File] hdf5_files
+    }
+
+    command <<<
+        for f in ~{sep=" " hdf5_files}; do
+            ln -s "$f" .
+        done
+
+        ~{julia_cmd} make-outputs interactions
+            
+    >>>
+
+    output {
+        File hdf5_output = "results.hdf5"
+        File yaml_output = "results.summary.yaml"
+        File qq_output = "QQ.png"
+    }
+
+    runtime {
+        docker: docker_image
+        dx_instance_type: "mem1_ssd1_v2_x8"
+    }
+
 }
 
 task estimate_interaction {

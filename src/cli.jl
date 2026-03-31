@@ -16,6 +16,10 @@ function cli_settings()
             action = :command
             help = "Estimate all interactions in the batch file"
 
+        "make-outputs"
+            action = :command
+            help = "Generate pipeline outputs."
+
     end
 
     @add_arg_table! s["generate-interactions"] begin
@@ -89,6 +93,21 @@ function cli_settings()
             help = "Output prefix"
     end
 
+    @add_arg_table! s["make-outputs"] begin
+        "input-prefix"
+            help = "Input prefix to the results file."
+            required = true
+
+        "--output-prefix"
+            help = "Prefix to output plots."
+            default = "."
+
+        "--verbosity"
+            help = "Logging level."
+            arg_type = Int
+            default = 0
+    end
+
     return s
 end
 
@@ -116,6 +135,12 @@ function julia_main()::Cint
             positivity_constraint=cmd_settings["positivity-constraint"],
             estimator_config=cmd_settings["estimator-config"],
             output_prefix=cmd_settings["output-prefix"]
+        )
+    elseif cmd == "make-outputs"
+        make_outputs(
+            cmd_settings["input-prefix"];
+            output_prefix=cmd_settings["output-prefix"],
+            verbosity=cmd_settings["verbosity"],
         )
     else
         throw(ArgumentError(string("Unknown command: ", cmd)))

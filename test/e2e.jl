@@ -63,7 +63,10 @@ pruned_variants_df = CSV.read(
 pcs = CSV.read(joinpath(pca_output_dir, "ld_pruned.no_proximal.all_chr.eigenvec"), DataFrame)
 @test names(pcs) == ["#FID", "IID", ("PC$i" for i in 1:10)...]
 
-
+# Test estimation step
+for shard in (0, 1)
+    @test isfile(joinpath(results_dir, "call-estimate_interaction", "shard-$shard", "execution", "interactions.batch_$(shard+1).json"))
+end
 
 end
 
