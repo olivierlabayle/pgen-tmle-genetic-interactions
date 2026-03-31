@@ -10,6 +10,7 @@ using Distributions
 using JLD2
 using Statistics
 using YAML
+using OrderedCollections
 
 include("utils.jl")
 include("estimands.jl")

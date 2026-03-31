@@ -4,6 +4,9 @@ using PgenInteractions
 using Test
 using CSV
 using DataFrames
+using YAML
+using TMLE
+using JLD2
 
 PKGDIR = pkgdir(PgenInteractions)
 
@@ -67,6 +70,13 @@ pcs = CSV.read(joinpath(pca_output_dir, "ld_pruned.no_proximal.all_chr.eigenvec"
 for shard in (0, 1)
     @test isfile(joinpath(results_dir, "call-estimate_interaction", "shard-$shard", "execution", "interactions.batch_$(shard+1).json"))
 end
+
+# Test outputs
+@test isfile(joinpath(results_dir, "call-generate_outputs", "execution", "QQ.png"))
+results_df = jldopen(joinpath(results_dir, "call-generate_outputs", "execution", "results.hdf5"))["results"]
+@test nrow(results_df) == 3
+results = YAML.load_file(joinpath(results_dir, "call-generate_outputs", "execution", "results.summary.yaml"))
+@test length(results) == 3
 
 end
 

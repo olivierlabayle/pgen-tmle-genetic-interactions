@@ -41,3 +41,25 @@ function pvalue_or_nan(Ψ̂, Ψ₀)
 end
 
 pvalue_or_nan(Ψ̂::TMLECLI.FailedEstimate, Ψ₀=nothing) = NaN
+
+###############################################################################
+###                          ESTIMANDS ACCESSORS                            ###
+###############################################################################
+
+get_outcome(Ψ) = Ψ.outcome
+
+function get_outcome(Ψ::JointEstimand)
+    outcome = get_outcome(first(Ψ.args))
+    check_variables_are_consistent(Ψ, outcome, get_outcome)
+    return outcome
+end
+
+MismatchedVariableError(variable) = ArgumentError(string("Each component of a JointEstimand should contain the same ", variable, " variables."))
+
+function check_variables_are_consistent(Ψ::JointEstimand, variable, variable_accessor, args...)
+    if length(Ψ.args) > 1
+        for Ψᵢ in Ψ.args[2:end]
+            variable_accessor(Ψᵢ, args...) == variable || throw(MismatchedVariableError(split(string(variable_accessor), "_")[end]))
+        end
+    end
+end

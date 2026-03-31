@@ -149,8 +149,7 @@ task generate_outputs {
             ln -s "$f" .
         done
 
-        ~{julia_cmd} make-outputs interactions
-            
+        ~{julia_cmd} make-outputs interactions.batch_
     >>>
 
     output {
