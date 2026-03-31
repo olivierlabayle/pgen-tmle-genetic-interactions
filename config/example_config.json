@@ -4,6 +4,7 @@
     "interactions.phenotype": "SEVERE_COVID_19",
     "interactions.variants_file": "dx://project-J0pkqyQJpYQ133JG1p2J1qzv:/assets/interaction_inputs/gwas_loci.tsv",
     "interactions.positivity_constraint": "0.01",
+    "interactions.batch_size": "200",
     "interactions.pgen_filesets": [
         {
             "chr": "1",

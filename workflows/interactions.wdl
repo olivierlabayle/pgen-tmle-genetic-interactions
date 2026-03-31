@@ -15,7 +15,7 @@ workflow interactions {
         Array[PGENFileset] pgen_filesets
 
         File variants_file
-        String batch_size = "20"
+        String batch_size = "200"
 
         String npcs = "10"
         String approx_pca = "true"
