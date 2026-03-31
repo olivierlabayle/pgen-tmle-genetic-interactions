@@ -9,15 +9,10 @@ TESTDIR = joinpath(pkgdir(PgenInteractions), "test")
 @testset "Test estimate_interactions" begin
     tmpdir = mktempdir()
 
-    pgen_list = joinpath(tmpdir, "pgen.txt")
-    open(pgen_list, "w") do io
-        println(io, joinpath(TESTDIR, "assets", "pgen", "chr1.qced.pgen"))
-        println(io, joinpath(TESTDIR, "assets", "pgen", "chr3.qced.pgen"))
-    end
-    chrom_list = joinpath(tmpdir, "chrom.txt")
-    open(chrom_list, "w") do io
-        println(io, "1")
-        println(io, "3")
+    variants_list = joinpath(tmpdir, "variants_list.txt")
+    open(variants_list, "w") do io
+        println(io, joinpath(TESTDIR, "assets", "raw", "variants_of_interest.chr_1.raw"))
+        println(io, joinpath(TESTDIR, "assets", "raw", "variants_of_interest.chr_3.raw"))
     end
 
     phenotype = "SEVERE_PNEUMONIA"
@@ -25,8 +20,7 @@ TESTDIR = joinpath(pkgdir(PgenInteractions), "test")
 
     copy!(ARGS, [
         "estimate-interactions",
-        pgen_list,
-        chrom_list,
+        variants_list,
         joinpath(TESTDIR, "assets", "covariates", "covariates.csv"),
         joinpath(TESTDIR, "assets", "pcs", "ld_pruned.no_proximal.all_chr.eigenvec"),
         joinpath(TESTDIR, "assets", "interactions.batch_1.tsv"),

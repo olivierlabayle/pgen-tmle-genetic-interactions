@@ -42,13 +42,9 @@ function cli_settings()
     end
 
     @add_arg_table! s["estimate-interactions"] begin
-        "pgen-list"
+        "variant-files"
             arg_type = String
-            help = "Path to list of pgen files"
-        
-        "chrom-list"
-            arg_type = String
-            help = "Path to list of chromosomes"
+            help = "Path to list of variant files"
 
         "covariates-file"
             arg_type = String
@@ -124,8 +120,7 @@ function julia_main()::Cint
         )
     elseif cmd == "estimate-interactions"
         estimate_interactions(
-            cmd_settings["pgen-list"],
-            cmd_settings["chrom-list"],
+            cmd_settings["variant-files"],
             cmd_settings["covariates-file"],
             cmd_settings["pcs-file"],
             cmd_settings["interaction-batch-file"];

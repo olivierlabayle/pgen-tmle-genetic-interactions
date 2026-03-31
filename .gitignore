@@ -32,3 +32,4 @@ cromwell-workflow-logs/
 interactions_workflow_outputs/
 gwas_loci.tsv
 config/example_config.dx.json
+sandbox.sh

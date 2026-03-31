@@ -43,7 +43,7 @@ workflow interactions {
     }
 
     scatter (pgen_fileset in pgen_filesets) {
-        call ld_prune {
+        call ld_prune_and_extract_variants_of_interest {
             input:
                 docker_image = docker_image,
                 chr = pgen_fileset.chr,
@@ -55,9 +55,9 @@ workflow interactions {
                 maf = maf
         }
         
-        File plink_bed_files = ld_prune.ld_pruned_fileset.bed
-        File plink_bim_files = ld_prune.ld_pruned_fileset.bim
-        File plink_fam_files = ld_prune.ld_pruned_fileset.fam
+        File plink_bed_files = ld_prune_and_extract_variants_of_interest.ld_pruned_fileset.bed
+        File plink_bim_files = ld_prune_and_extract_variants_of_interest.ld_pruned_fileset.bim
+        File plink_fam_files = ld_prune_and_extract_variants_of_interest.ld_pruned_fileset.fam
 
         File pgen_files = pgen_fileset.pgen
         File pvar_files = pgen_fileset.pvar
@@ -76,36 +76,13 @@ workflow interactions {
     }
 
     scatter (interaction_batch in generate_interaction_batches.interaction_batches) {
-        # Those lines aimed to send only the relevant chromosomes to the estimate_interaction call
-        # However the contains function does not seem to be implemented in cromwell so I aborted
-        # call extract_chroms {
-        #     input: 
-        #         batch_file = interaction_batch
-        # }
-
-        # scatter (pgen_fileset in pgen_filesets) {
-        #     PGENFileset keep = if (contains(extract_chroms.chroms, pgen_fileset.chr)) then pgen_fileset else None
-        # }
-
-        # Array[PGENFileset] selected_pgen_filesets = select_all(keep)
-
-        # scatter (selected_pgen_fileset in selected_pgen_filesets) {
-        #     File selected_pgen_files = selected_pgen_fileset.pgen
-        #     File selected_pvar_files = selected_pgen_fileset.pvar
-        #     File selected_psam_files = selected_pgen_fileset.psam
-        # }
-        # Estimate interactions for the batch
-        
         call estimate_interaction {
             input:
                 docker_image = docker_image,
                 julia_cmd = get_julia_cmd.julia_cmd,
                 covariates_file = covariates_file,
                 pcs_file = merge_and_pca.eigenvec,
-                chromosomes = chromosomes,
-                pgen_files = pgen_files,
-                pvar_files = pvar_files,
-                psam_files = psam_files,
+                variant_data = select_all(ld_prune_and_extract_variants_of_interest.variants_of_interest),
                 interaction_batch_file = interaction_batch,
                 phenotype = phenotype,
                 covariates = covariates,
@@ -124,7 +101,7 @@ workflow interactions {
 
     output {
         Array[File] interaction_batches = generate_interaction_batches.interaction_batches
-        Array[PLINKFileset] ld_pruned_filesets = ld_prune.ld_pruned_fileset
+        Array[PLINKFileset] ld_pruned_filesets = ld_prune_and_extract_variants_of_interest.ld_pruned_fileset
         File eigenvec = merge_and_pca.eigenvec
         File eigenval = merge_and_pca.eigenval
         PLINKFileset merged_fileset = merge_and_pca.merged_ld_pruned_fileset
@@ -132,7 +109,6 @@ workflow interactions {
         File hdf5_output = generate_outputs.hdf5_output
         File yaml_output = generate_outputs.yaml_output
         File qq_output = generate_outputs.qq_output
-
     }
 }
 
@@ -171,10 +147,7 @@ task estimate_interaction {
         String julia_cmd
         File covariates_file
         File pcs_file
-        Array[String] chromosomes
-        Array[File] pgen_files
-        Array[File] pvar_files
-        Array[File] psam_files
+        Array[File] variant_data
         File interaction_batch_file
         String phenotype
         Array[String] covariates
@@ -186,13 +159,9 @@ task estimate_interaction {
     String output_prefix = basename(interaction_batch_file, ".tsv")
 
     command <<<
-        for f in ~{sep=" " pgen_files}; do
-            echo "${f%.bed}"
-        done > pgen_files.txt
-
-        for f in ~{sep=" " chromosomes}; do
-            echo "${f%.bed}"
-        done > chromosomes.txt
+        for f in ~{sep=" " variant_data}; do
+            echo "${f}"
+        done > variant_files.txt
 
         covariate_opt="~{sep="," covariates}"
         if [ -n "${covariate_opt}" ]; then
@@ -205,8 +174,7 @@ task estimate_interaction {
         fi
 
         ~{julia_cmd} estimate-interactions \
-            pgen_files.txt \
-            chromosomes.txt \
+            variant_files.txt \
             ~{covariates_file} \
             ~{pcs_file} \
             ~{interaction_batch_file} \
@@ -319,7 +287,7 @@ task merge_and_pca {
 }
 
 
-task ld_prune {
+task ld_prune_and_extract_variants_of_interest {
     input {
         String docker_image
         String chr
@@ -336,6 +304,7 @@ task ld_prune {
 
         plink2 \
             --pfile ${pgen_prefix} \
+            --rm-dup force-first \
             --indep-pairwise ~{ip_values}
         # Always exclude high LD regions stored in the docker image at /opt/PgenInteractions/exclude_b38.txt
         plink2 \
@@ -367,6 +336,21 @@ task ld_prune {
             --exclude range exclude_ranges.txt \
             --make-bed \
             --out ld_pruned.no_proximal.chr_~{chr}
+
+        # Extract raw data for the variants of interest
+        awk -F'\t' '
+            NR==1 {
+            for (i=1; i<=NF; i++) if ($i=="ID") col=i
+            next
+            }
+            { print $col }
+        ' ~{variants_file} > variants_of_interest.txt
+
+        plink2 \
+            --pfile ${pgen_prefix} \
+            --extract variants_of_interest.txt \
+            --export A include-alt \
+            --out variants_of_interest.chr_~{chr} || echo "No variant of interest on this chromosome."
     >>>
 
     output {
@@ -376,6 +360,7 @@ task ld_prune {
             bim: "ld_pruned.no_proximal.chr_${chr}.bim",
             fam: "ld_pruned.no_proximal.chr_${chr}.fam"
         }
+        File? variants_of_interest = "variants_of_interest.chr_${chr}.raw"
     }
 
     runtime {

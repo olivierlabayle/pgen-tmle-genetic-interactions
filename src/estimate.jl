@@ -1,46 +1,19 @@
-function update_chr_to_variant!(chr_to_variants, key, val)
-    if haskey(chr_to_variants, key)
-        push!(chr_to_variants[key], val)
-    else
-        chr_to_variants[key] = Set([val])
-    end
-end
+function extract_variants_from_raw_files(interaction_variants, variant_files)
+    variants_of_interest = unique(vcat(interaction_variants.ID_1, interaction_variants.ID_2))
 
-function get_chr_to_variants(interaction_variants)
-    chr_to_variants = Dict()
-    for row in eachrow(interaction_variants)
-        update_chr_to_variant!(chr_to_variants, row.CHROM_1, row.ID_1)
-        update_chr_to_variant!(chr_to_variants, row.CHROM_2, row.ID_2)
-    end
-    return chr_to_variants
-end
-
-function extract_variants_from_pgens(interaction_variants, chr_to_pgen)
-    chr_to_variants = get_chr_to_variants(interaction_variants)
-    
-    # Extract all relevant variants to a table using plink2
     variants_dfs = []
-    for (chr, variants) in chr_to_variants
-        pgen_prefix = replace(chr_to_pgen[string(chr)], ".pgen" => "")
-        tmpdir = mktempdir()
-        extract_list = joinpath(tmpdir, "variants.txt")
-        open(extract_list, "w") do io
-            for v in variants
-                println(io, v)
-            end
+    for raw_file in readlines(variant_files)
+        variant_names_in_file = names(CSV.read(raw_file, DataFrame; limit=0, drop=[:FID, :IID, :PAT, :MAT, :SEX, :PHENOTYPE]))
+        source_variant_names_in_file = [join(split(name, "_")[1:end-1], "_") for name in variant_names_in_file]
+        variants_of_interest_in_file = intersect(variants_of_interest, source_variant_names_in_file)
+        if !isempty(variants_of_interest_in_file)
+            ori_to_file_variant_map = Dict(in_file => src for (in_file, src) in zip(variant_names_in_file, source_variant_names_in_file) if src in variants_of_interest_in_file)
+            raw_data = CSV.read(raw_file, DataFrame; missingstring="NA", select=["FID", "IID", keys(ori_to_file_variant_map)...])
+            rename!(raw_data, ori_to_file_variant_map)
+            push!(variants_dfs, raw_data)
         end
-        outprefix = joinpath(tmpdir, string("chr", chr))
-        run(`plink2 \
-            --pfile $pgen_prefix \
-            --extract $extract_list \
-            --export A include-alt \
-            --out $outprefix
-        `)
-        push!(
-            variants_dfs,
-            CSV.read(string(outprefix, ".raw"), DataFrame; missingstring="NA", drop=[:PAT, :MAT, :SEX, :PHENOTYPE])
-        )
     end
+    
     variants_df = popfirst!(variants_dfs)
     while length(variants_dfs) > 0
         variants_df = innerjoin(
@@ -49,13 +22,7 @@ function extract_variants_from_pgens(interaction_variants, chr_to_pgen)
             on=[:FID, :IID]
         )
     end
-    # Rename variant Ids to their original names
-    for name in names(variants_df)
-        if name ∉ ["FID", "IID"]
-            original_name = join(split(name, "_")[1:end-1], "_")
-            rename!(variants_df, name => original_name)
-        end
-    end
+
     return variants_df
 end
 
@@ -63,12 +30,12 @@ make_list_from_option(opt::Nothing) = []
 
 make_list_from_option(x) = split(x, ",")
 
-function make_dataset(interaction_variants, chr_to_pgen, pcs_file, covariates_file; 
+function make_dataset(interaction_variants, variant_files, pcs_file, covariates_file; 
     covariates=[], 
     confounders=[], 
     phenotype="Y"
     )
-    dataset = extract_variants_from_pgens(interaction_variants, chr_to_pgen)
+    dataset = extract_variants_from_raw_files(interaction_variants, variant_files)
     dataset = innerjoin(
         dataset, 
         CSV.read(pcs_file, DataFrame), 
@@ -86,8 +53,7 @@ function make_dataset(interaction_variants, chr_to_pgen, pcs_file, covariates_fi
 end
 
 function estimate_interactions(
-    pgen_file_list,
-    chrom_list,
+    variant_files,
     covariates_file, 
     pcs_file,
     interaction_batch_file;
@@ -101,15 +67,14 @@ function estimate_interactions(
 
     confounders = make_list_from_option(confounders)
     covariates = make_list_from_option(covariates)
-    chr_to_pgen = Dict(chr => file for (chr, file) in zip(readlines(chrom_list), readlines(pgen_file_list)))
     interaction_variants = CSV.read(interaction_batch_file, DataFrame)
-    dataset = make_dataset(interaction_variants, chr_to_pgen, pcs_file, covariates_file; 
+    dataset = make_dataset(interaction_variants, variant_files, pcs_file, covariates_file; 
         covariates=covariates, 
         confounders=confounders, 
         phenotype=phenotype
     )
-    pcs = filter(startswith("PC"), names(dataset))
-    all_confounders = vcat(confounders, pcs)
+    pc_variables = filter(startswith("PC"), names(dataset))
+    all_confounders = vcat(confounders, pc_variables)
 
     estimands = []
     for row in eachrow(interaction_variants)
