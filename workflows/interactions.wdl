@@ -24,7 +24,7 @@ workflow interactions {
         String maf = "0.01"
 
         String positivity_constraint = "0.01"
-        String estimator_config = "wtmle"
+        String estimator_config = "wtmle-ose--tunedxgboost--tunedxgboost"
 
     }
 
