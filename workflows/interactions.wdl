@@ -11,6 +11,7 @@ workflow interactions {
         String phenotype
         Array[String] covariates = ["AGE", "SEX"]
         Array[String] confounders = []
+        String adjustment_window_kb = "1000"
         File covariates_file
         Array[PGENFileset] pgen_filesets
 
@@ -39,7 +40,8 @@ workflow interactions {
             docker_image = docker_image,
             julia_cmd = get_julia_cmd.julia_cmd,
             variants_file = variants_file,
-            batch_size = batch_size
+            batch_size = batch_size,
+            adjustment_window_kb = adjustment_window_kb
     }
 
     scatter (pgen_fileset in pgen_filesets) {
@@ -375,13 +377,15 @@ task generate_interaction_batches {
         String julia_cmd
         File variants_file
         String batch_size = "20"
+        String adjustment_window_kb = "1000"
     }
 
     command <<<
         ~{julia_cmd} generate-interactions \
             ~{variants_file} \
             --output-prefix interactions \
-            --batch-size ~{batch_size}
+            --batch-size ~{batch_size} \
+            --adjustment-window-kb ~{adjustment_window_kb}
     >>>
 
     output {

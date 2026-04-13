@@ -36,12 +36,17 @@ TESTDIR = joinpath(pkgdir(PgenInteractions), "test")
 
     json_results = JSON.parsefile(string(output_prefix, ".json"))
     json_result_1 = first(json_results)
+    treatment_linked_variant = Dict(
+        "chr1:183905563:G:A" => ["chr1:40310265:G:A"],
+        "chr3:171645187:A:G" => [],
+        "chr1:40310265:G:A" => ["chr1:183905563:G:A"]
+    )
     for json_result in json_results
         for estimand in json_result["OSE_GLMNET_GLMNET"]["estimand"]["args"]
             @test estimand["outcome"] == phenotype
             @test estimand["outcome_extra_covariates"] == ["AGE"]
             for (treatment, confounders) in estimand["treatment_confounders"]
-                @test confounders == sort(vcat(["PC$i" for i in 1:10], "SEX"))
+                @test confounders == sort(vcat(["PC$i" for i in 1:10], treatment_linked_variant[treatment], "SEX"))
             end
         end
     end

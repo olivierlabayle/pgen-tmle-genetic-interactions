@@ -13,7 +13,8 @@ Note that almost all arguments must be strings.
 - `julia_threads` (default: "auto"): Number of threads to use in Julia processes.
 - `phenotype`: The phenotype under investigation, mut have a matching column in the `covariates_file`.
 - `covariates` (default: ["AGE", "SEX"]): Covariates to be used by the predictive models in the TMLE step.
-- `confounders` (default: []): Aditional confounders to add to the estimation process beside principal components.
+- `confounders` (default: []): Additional confounders to add to the estimation process beside principal components.
+- `adjustment_window_kb` (default: 1000): Variants in `variants_file` will be added to the confounding variable set if they are close to a target interacting variant. This is to make sure all discovered interactions are independent.
 - `covariates_file`: A tab separated file containing covariates and phenotype.
 - `pgen_filesets`: One per chromosome, see `config/example_config.json` for an example.
 - `variants_file`: A 3 columns tab separated file of variants for which all pairwise interactionswill be estimated. The columns must be:

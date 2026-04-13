@@ -39,6 +39,12 @@ function cli_settings()
             required = false
             help = "Maximum number of interactions to be estimaed per batch."
             default = 20
+
+        "--adjustment-window-kb"
+            arg_type = Float64
+            required = false
+            help = "All variants in the window will be included in the confouders set."
+            default = 1000
     end
 
     @add_arg_table! s["estimate-interactions"] begin
@@ -116,7 +122,8 @@ function julia_main()::Cint
         generate_interaction_batches(
             cmd_settings["variants-file"];
             output_prefix=cmd_settings["output-prefix"],
-            batch_size=cmd_settings["batch-size"]
+            batch_size=cmd_settings["batch-size"],
+            adjustment_window_kb=cmd_settings["adjustment-window-kb"]
         )
     elseif cmd == "estimate-interactions"
         estimate_interactions(

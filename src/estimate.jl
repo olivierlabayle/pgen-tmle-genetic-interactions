@@ -16,7 +16,9 @@ function hardcall(dosages; threshold=0.2)
 end
 
 function extract_variants_from_raw_files(interaction_variants, variant_files; hard_call_threshold=0.2)
-    variants_of_interest = unique(vcat(interaction_variants.ID_1, interaction_variants.ID_2))
+    linked_1 = vcat(split.(skipmissing(interaction_variants.LINKED_1), ";&;")...)
+    linked_2 = vcat(split.(skipmissing(interaction_variants.LINKED_2), ";&;")...)
+    variants_of_interest = unique(vcat(interaction_variants.ID_1, interaction_variants.ID_2, linked_1, linked_2))
 
     variants_dfs = []
     for raw_file in readlines(variant_files)
@@ -73,6 +75,21 @@ function make_dataset(interaction_variants, variant_files, pcs_file, covariates_
     )
 end
 
+confounder_string_to_list(x::Missing) = []
+
+confounder_string_to_list(x) = split(x, ";&;")
+
+make_variant_confounders(all_confounders, linked_variants, variants_in_interaction) = 
+    Symbol.(unique(vcat(all_confounders, setdiff(confounder_string_to_list(linked_variants), variants_in_interaction))))
+
+function generate_variants_confounders(row, all_confounders)
+    variants_in_interaction = [row.ID_1, row.ID_2]
+    return Dict(
+        Symbol(row.ID_1) => make_variant_confounders(all_confounders, row.LINKED_1, variants_in_interaction),
+        Symbol(row.ID_2) => make_variant_confounders(all_confounders, row.LINKED_2, variants_in_interaction),
+    )
+end
+
 function estimate_interactions(
     variant_files,
     covariates_file, 
@@ -107,7 +124,7 @@ function estimate_interactions(
                 AIE,
                 (row.ID_1, row.ID_2),
                 phenotype;
-                confounders=all_confounders,
+                confounders=generate_variants_confounders(row, all_confounders),
                 positivity_constraint=positivity_constraint,
                 outcome_extra_covariates=covariates,
                 dataset=dataset,
